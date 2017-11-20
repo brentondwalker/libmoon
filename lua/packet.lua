@@ -60,16 +60,21 @@ end
 
 --- Retrieve the time stamp information.
 --- @return The timestamp or nil if the packet was not time stamped.
-function pkt:getTimestamp()
-
+function pkt:getTimestamp(dev)
 	if bit.bor(self.ol_flags, dpdk.PKT_RX_IEEE1588_TMST) ~= 0 then
-		-- TODO: support timestamps that are stored in registers instead of the rx buffer
 		local data = ffi.cast("uint32_t* ", self:getData())
-		-- TODO: this is only tested with the Intel 82580 NIC at the moment
-		-- the datasheet claims that low and high are swapped, but this doesn't seem to be the case
-		-- TODO: check other NICs
-		local low = data[2]
-		local high = data[3]
+		local low, high
+		if dev and dev.embeddedTimestampAtEndOfBuffer then
+			local timestamp = ffi.cast("uint32_t*", ffi.cast("uint8_t*", self:getData()) + self:getSize() - 8)
+			low = timestamp[0]
+			high = timestamp[1]
+		else
+			-- TODO: this is only tested with the Intel 82580 NIC at the moment
+			-- the datasheet claims that low and high are swapped, but this doesn't seem to be the case
+			-- TODO: check other NICs
+			low = data[2]
+			high = data[3]
+		end
 		return high * 2^32 + low
 	end
 end
@@ -129,14 +134,15 @@ end
 --- @param bytes number of bytes to dump, optional (default = packet size)
 --- @param stream the stream to write to, optional (default = io.stdout)
 --- @param colorized Print the dump with different colors for each protocol (default = true)
-function pkt:dump(bytes, stream, colorized)
+--- @param wireshark Dump in wireshark compatible format (Wireshark -> Import from Hex Dump)
+function pkt:dump(bytes, stream, colorized, wireshark)
 	if type(bytes) == "userdata" then
 		stream = bytes
 		colorized = stream
 		bytes = nil
 	end
 	colorized = colorized == nil or colorized
-	self:get():dump(bytes or self.pkt_len, stream or io.stdout, colorized)
+	self:get():dump(bytes or self.pkt_len, stream or io.stdout, colorized, wireshark)
 end
 
 function pkt:free()
@@ -420,7 +426,8 @@ end
 --- @param bytes Number of bytes to dump. If no size is specified the payload is truncated.
 --- @param stream the IO stream to write to, optional (default = io.stdout)
 --- @param colorized Dump the packet colorized, every protocol in a different color (default = true)
-function packetDump(self, bytes, stream, colorized) 
+--- @param wireshark Dump in wireshark compatible format (Wireshark -> Import from Hex Dump)
+function packetDump(self, bytes, stream, colorized, wireshark) 
 	if type(bytes) == "userdata" then
 		-- if someone calls this directly on a packet
 		stream = bytes
@@ -429,30 +436,34 @@ function packetDump(self, bytes, stream, colorized)
 	bytes = bytes or ffi.sizeof(self:getName())
 	stream = stream or io.stdout
 	colorized = colorized == nil or colorized
-
-	-- print timestamp
-	stream:write(colorized and white(getTimeMicros()) or getTimeMicros())
+	wireshark = wireshark or false
 
 	-- separators (protocol offsets) for colorized hex dump
 	local seps = { }
 	local colorCode = ''
-	-- headers in cleartext
-	for i, v in ipairs(self:getHeaders()) do
-		if colorized then
-			colorCode = getColorCode(i)
-		end
 
-		local str = v:getString()
-		if i == 1 then
-			stream:write(colorCode .. " " .. str .. "\n")
-		else
-			stream:write(colorCode .. str .. "\n")
+	if not wireshark then
+		-- print timestamp
+		stream:write(colorized and white(getTimeMicros()) or getTimeMicros())
+
+		-- headers in cleartext
+		for i, v in ipairs(self:getHeaders()) do
+			if colorized then
+				colorCode = getColorCode(i)
+			end
+
+			local str = v:getString()
+			if i == 1 then
+				stream:write(colorCode .. " " .. str .. "\n")
+			else
+				stream:write(colorCode .. str .. "\n")
+			end
+			seps[#seps + 1] = (seps[#seps] or 0 ) + ffi.sizeof(v)
 		end
-		seps[#seps + 1] = (seps[#seps] or 0 ) + ffi.sizeof(v)
 	end
 
 	-- hex dump
-	dumpHex(self, bytes, stream, colorized and seps or nil)
+	dumpHex(self, bytes, stream, colorized and seps or nil, wireshark)
 end
 
 --- Set all members of all headers.
@@ -530,10 +541,13 @@ function packetResolveLastHeader(self)
 			else
 				newArgs[#newArgs]["length"] = len
 			end
-			pkt.TMP_PACKET = createStack(unpack(newArgs))
 			-- build name with len adjusted
 			sub[#sub - 1] = len
 			local newName = table.concat(sub, "_")
+			-- create stack if necessary
+			if not pkt.packetStructs[newName] then
+				pkt.TMP_PACKET = createStack(unpack(newArgs))
+			end
 			if name ~= newName then
 				return ffi.cast(newName .. "*", self):resolveLastHeader()
 			end
@@ -557,7 +571,7 @@ function packetResolveLastHeader(self)
 
 		-- if simple struct (headername = membername) already exists we can directly cast
 		--nextMember = nextHeader
-		newName = name .. nextMember .. "_x_" .. (nextSubType or "x")
+		newName = name .. "_" .. nextMember .. "_x_" .. (nextSubType or "x")
 
 		if not pkt.packetStructs[newName] then
 			-- check if a similar struct with this header order exists
@@ -717,7 +731,7 @@ local function defineHeaderStruct(p, subType, size)
 	-- define and add header related functions
 	ffi.cdef(str)
 	ffi.metatype("struct " .. name, (subType and proto[p][subType].metatype or proto[p].metatype))
-	log:debug("Created " .. name)
+	log:debug("Created " .. name .. str)
 
 	-- add to list of already created header structs
 	createdHeaderStructs[name] = true

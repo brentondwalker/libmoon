@@ -14,12 +14,14 @@ ffi.cdef [[
 	struct mpmc_ptr_queue { };
 
 	struct spsc_ptr_queue* pipe_spsc_new(int size);
+	void pipe_spsc_delete(struct spsc_ptr_queue* queue);
 	void pipe_spsc_enqueue(struct spsc_ptr_queue* queue, void* data);
 	uint8_t pipe_spsc_try_enqueue(struct spsc_ptr_queue* queue, void* data);
 	void* pipe_spsc_try_dequeue(struct spsc_ptr_queue* queue);
 	size_t pipe_spsc_count(struct spsc_ptr_queue* queue);
 
 	struct mpmc_ptr_queue* pipe_mpmc_new(int size);
+	void pipe_mpmc_delete(struct mpmc_ptr_queue* queue);
 	void pipe_mpmc_enqueue(struct mpmc_ptr_queue* queue, void* data);
 	uint8_t pipe_mpmc_try_enqueue(struct mpmc_ptr_queue* queue, void* data);
 	void* pipe_mpmc_try_dequeue(struct mpmc_ptr_queue* queue);
@@ -39,7 +41,7 @@ local packetRing = mod.packetRing
 packetRing.__index = packetRing
 
 function mod:newPacketRing(size, socket)
-	size = size or 8192
+	size = size or 512
 	socket = socket or -1
 	return setmetatable({
 		ring = C.create_ring(size, socket)
@@ -55,18 +57,18 @@ end
 local ENOBUFS = S.c.E.NOBUFS
 
 -- FIXME: this is work-around for some bug with the serialization of nested objects
-function mod:sendToPacketRing(ring, bufs)
-	return C.ring_enqueue(ring, bufs.array, bufs.size) ~= -ENOBUFS
+function mod:sendToPacketRing(ring, bufs, n)
+	return C.ring_enqueue(ring, bufs.array, n or bufs.size) > 0
 end
 
 -- try to enqueue packets in a ring, returns true on success
 function packetRing:send(bufs)
-	return C.ring_enqueue(self.ring, bufs.array, bufs.size) ~= -ENOBUFS
+	return C.ring_enqueue(self.ring, bufs.array, bufs.size) > 0
 end
 
 -- try to enqueue packets in a ring, returns true on success
 function packetRing:sendN(bufs, n)
-	return C.ring_enqueue(self.ring, bufs.array, n) ~= -ENOBUFS
+	return C.ring_enqueue(self.ring, bufs.array, n) > 0
 end
 
 function packetRing:recv(bufs)
@@ -111,6 +113,7 @@ function slowPipe:send(...)
 end
 
 function slowPipe:tryRecv(wait)
+	wait = wait or 0
 	while wait >= 0 do
 		local buf = C.pipe_mpmc_try_dequeue(self.pipe)
 		if buf ~= nil then
@@ -146,6 +149,10 @@ function slowPipe:empty()
 	while self:count() > 0 do
 		self:recv()
 	end
+end
+
+function slowPipe:delete()
+	C.pipe_mpmc_delete(self.pipe)
 end
 
 function slowPipe:__serialize()
@@ -208,6 +215,10 @@ end
 
 function fastPipe:count()
 	return tonumber(C.pipe_spsc_count(self.pipe))
+end
+
+function fastPipe:delete()
+	C.pipe_spsc_delete(self.pipe)
 end
 
 function fastPipe:__serialize()
