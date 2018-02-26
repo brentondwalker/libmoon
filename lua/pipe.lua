@@ -32,6 +32,7 @@ ffi.cdef [[
 	struct rte_ring* create_ring(uint32_t count, int32_t socket);
 	int ring_enqueue(struct rte_ring* r, struct rte_mbuf** obj, int n);
 	int ring_dequeue(struct rte_ring* r, struct rte_mbuf** obj, int n);
+	int ring_count(struct rte_ring* r);
 ]]
 
 local C = ffi.C
@@ -60,6 +61,15 @@ local ENOBUFS = S.c.E.NOBUFS
 function mod:sendToPacketRing(ring, bufs, n)
 	return C.ring_enqueue(ring, bufs.array, n or bufs.size) > 0
 end
+
+function mod:recvFromPacketRing(ring, bufs, n)
+	return C.ring_dequeue(ring, bufs.array, n or bufs.size)
+end
+
+function mod:countPacketRing(ring)
+	return C.ring_count(ring)
+end
+
 
 -- try to enqueue packets in a ring, returns true on success
 function packetRing:send(bufs)
