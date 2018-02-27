@@ -9,12 +9,16 @@
  * limits the number of bytes it can hold.
  */
 
-
 struct bs_ring* create_bsring(uint32_t capacity, int32_t socket) {
 	static volatile uint32_t ring_cnt = 0;
-	int count = capacity/60;
+	int count_min = capacity/60;
+	int count = 1;
+	while (count < count_min && count <= RING_SIZE_LIMIT) {
+		count *= 2;
+	}
 	char ring_name[32];
 	struct bs_ring* bsr = (struct bs_ring*)malloc(sizeof(struct bs_ring*));
+	printf("create_bsring(%d,%d)\n",capacity,socket);
 	bsr->capacity = capacity;
 	sprintf(ring_name, "mbuf_bs_ring%d", __sync_fetch_and_add(&ring_cnt, 1));
 	bsr->ring = rte_ring_create(ring_name, count, socket, RING_F_SP_ENQ | RING_F_SC_DEQ);
@@ -23,6 +27,7 @@ struct bs_ring* create_bsring(uint32_t capacity, int32_t socket) {
 		free(bsr);
 		return NULL;
 	}
+	printf("returning bsr\n");
 	return bsr;
 }
 

@@ -29,13 +29,88 @@ ffi.cdef [[
 	
 	// DPDK SPSC ring
 	struct rte_ring { };
+	//struct rte_mbuf { };
 	struct rte_ring* create_ring(uint32_t count, int32_t socket);
 	int ring_enqueue(struct rte_ring* r, struct rte_mbuf** obj, int n);
 	int ring_dequeue(struct rte_ring* r, struct rte_mbuf** obj, int n);
 	int ring_count(struct rte_ring* r);
+
+	// Bite-Sized Ring wrapper for DPDK SPSC ring
+	struct bs_ring { };
+	struct bs_ring* create_bsring(uint32_t capacity, int32_t socket);
+	int bsring_enqueue_bulk(struct bs_ring* bsr, struct rte_mbuf** obj, int n);
+	int bsring_enqueue(struct bs_ring* bsr, struct rte_mbuf* obj);
+	int bsring_dequeue_bulk(struct bs_ring* bsr, struct rte_mbuf** obj, int n);
+	int bsring_count(struct bs_ring* r);
+	int bsring_capacity(struct bs_ring* bsr);
+	int bsring_bytesused(struct bs_ring* bsr);
 ]]
 
 local C = ffi.C
+
+-- ====================================================================================================
+
+mod.bytesizedRing = {}
+local bytesizedRing = mod.bytesizedRing
+bytesizedRing.__index = bytesizedRing
+
+function mod:newBytesizedRing(capacity, socket)
+	size = size or (1524*512)
+	socket = socket or -1
+	return setmetatable({
+		ring = C.create_bsring(capacity, socket)
+	}, bytesizedRing)
+end
+
+function mod:newBytesizedRingFromRing(ring)
+	return setmetatable({
+		ring = ring
+	}, bytesizedRing)
+end
+
+local ENOBUFS = S.c.E.NOBUFS
+
+-- FIXME: this is work-around for some bug with the serialization of nested objects
+function mod:sendToBytesizedRing(ring, bufs, n)
+	return C.bsring_enqueue_bulk(ring, bufs.array, n or bufs.size) > 0
+end
+
+function mod:recvFromBytesizedRing(ring, bufs, n)
+	return C.bsring_dequeue_bulk(ring, bufs.array, n or bufs.size)
+end
+
+function mod:countBytesizedRing(ring)
+	return C.bsring_count(ring)
+end
+
+function mod:capacityBytesizedRing(ring)
+	return C.bsring_capacity(ring)
+end
+
+function mod:bytesusedBytesizedRing(ring)
+	return C.bsring_bytesused(ring)
+end
+
+
+-- try to enqueue packets in a ring, returns true on success
+function bytesizedRing:send(bufs)
+	return C.bsring_enqueue_bulk(self.ring, bufs.array, bufs.size) > 0
+end
+
+-- try to enqueue packets in a ring, returns true on success
+function bytesizedRing:sendN(bufs, n)
+	return C.bsring_enqueue_bulk(self.ring, bufs.array, n) > 0
+end
+
+function bytesizedRing:recv(bufs)
+	error("NYI")
+end
+
+function bytesizedRing:__serialize()
+	return "require'pipe'; return " .. serpent.addMt(serpent.dumpRaw(self), "require('pipe').bytesizedRing"), true
+end
+
+-- ====================================================================================================
 
 mod.packetRing = {}
 local packetRing = mod.packetRing
@@ -88,6 +163,8 @@ end
 function packetRing:__serialize()
 	return "require'pipe'; return " .. serpent.addMt(serpent.dumpRaw(self), "require('pipe').packetRing"), true
 end
+
+-- ====================================================================================================
 
 mod.slowPipe = {}
 local slowPipe = mod.slowPipe
@@ -169,6 +246,7 @@ function slowPipe:__serialize()
 	return "require'pipe'; return " .. serpent.addMt(serpent.dumpRaw(self), "require('pipe').slowPipe"), true
 end
 
+-- ====================================================================================================
 
 mod.fastPipe = {}
 local fastPipe = mod.fastPipe

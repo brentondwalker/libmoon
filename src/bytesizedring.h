@@ -10,6 +10,8 @@
 extern "C" {
 #endif
 
+#define RING_SIZE_LIMIT 268435455
+
 struct bs_ring
 {
 	struct rte_ring* ring;
