@@ -1,6 +1,7 @@
 #include <rte_config.h>
 #include <rte_common.h>
 #include <rte_ring.h>
+#include <rte_rwlock.h>
 #include "bytesizedring.h"
 
 // DPDK SPSC bounded ring buffer
@@ -23,6 +24,7 @@ struct bs_ring* create_bsring(uint32_t capacity, int32_t socket) {
 	sprintf(ring_name, "mbuf_bs_ring%d", __sync_fetch_and_add(&ring_cnt, 1));
 	bsr->ring = rte_ring_create(ring_name, count, socket, RING_F_SP_ENQ | RING_F_SC_DEQ);
 	bsr->used = 0;
+	rte_rwlock_init(&(bsr->used_lock));
 	if (! bsr->ring) {
 		free(bsr);
 		return NULL;
@@ -43,7 +45,9 @@ int bsring_enqueue_bulk(struct bs_ring* bsr, struct rte_mbuf** obj, int n) {
 int bsring_enqueue(struct bs_ring* bsr, struct rte_mbuf* obj) {
 	if (bsr->used < bsr->capacity) {
 		if (rte_ring_sp_enqueue(bsr->ring, obj) == 0) {
-			bsr->used += obj->pkt_len;
+			rte_rwlock_write_lock(&(bsr->used_lock));
+			bsr->used += (obj->pkt_len + 24);
+			rte_rwlock_write_unlock(&(bsr->used_lock));
 			return 1;
 		}
 	}
@@ -54,7 +58,9 @@ int bsring_dequeue_bulk(struct bs_ring* bsr, struct rte_mbuf** obj, int n) {
 	int num_dequeued = rte_ring_sc_dequeue_bulk(bsr->ring, (void**)obj, n, NULL);
 	int i = 0;
 	for (i=0; i<num_dequeued; i++) {
-		bsr->used -= obj[i]->pkt_len;
+		rte_rwlock_write_lock(&(bsr->used_lock));
+		bsr->used -= (obj[i]->pkt_len + 24);
+		rte_rwlock_write_unlock(&(bsr->used_lock));
 	}
 	return num_dequeued;
 }

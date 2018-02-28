@@ -5,6 +5,7 @@
 #include <rte_common.h>
 #include <rte_ring.h>
 #include <rte_mbuf.h>
+#include <rte_rwlock.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -17,6 +18,7 @@ struct bs_ring
 	struct rte_ring* ring;
 	int capacity;
 	int used;
+	rte_rwlock_t used_lock;
 };
 
 struct bs_ring* create_bsring(uint32_t capacity, int32_t socket);
