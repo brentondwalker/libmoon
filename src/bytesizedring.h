@@ -16,8 +16,8 @@ extern "C" {
 struct bs_ring
 {
 	struct rte_ring* ring;
-	int capacity;
-	int used;
+	uint32_t capacity;
+	uint32_t used;
 	rte_rwlock_t used_lock;
 };
 

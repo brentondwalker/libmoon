@@ -43,7 +43,7 @@ int bsring_enqueue_bulk(struct bs_ring* bsr, struct rte_mbuf** obj, int n) {
 }
 
 int bsring_enqueue(struct bs_ring* bsr, struct rte_mbuf* obj) {
-	if (bsr->used < bsr->capacity) {
+	if ((bsr->used + obj->pkt_len + 24) < bsr->capacity) {
 		if (rte_ring_sp_enqueue(bsr->ring, obj) == 0) {
 			rte_rwlock_write_lock(&(bsr->used_lock));
 			bsr->used += (obj->pkt_len + 24);
