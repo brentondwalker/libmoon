@@ -11,7 +11,7 @@
 extern "C" {
 #endif
 
-#define RING_SIZE_LIMIT 268435455
+#define BS_RING_SIZE_LIMIT 268435455
 
 struct bs_ring
 {
@@ -22,10 +22,20 @@ struct bs_ring
 };
 
 struct bs_ring* create_bsring(uint32_t capacity, int32_t socket);
+
+/**
+ * The difference between bulk and burst is when n>1.  In those
+ * cases bulk mode will only en/dequeue a full batch.  In burst
+ * mode it will enqueue whatever there is space for, or dequeue
+ * as many as are available, up to n.
+ */
 int bsring_enqueue_bulk(struct bs_ring* bsr, struct rte_mbuf** obj, int n);
+int bsring_enqueue_burst(struct bs_ring* bsr, struct rte_mbuf** obj, int n);
 int bsring_enqueue(struct bs_ring* bsr, struct rte_mbuf* obj);
 int bsring_dequeue_bulk(struct bs_ring* bsr, struct rte_mbuf** obj, int n);
-int bsring_count(struct bs_ring* r);
+int bsring_dequeue_burst(struct bs_ring* bsr, struct rte_mbuf** obj, int n);
+int bsring_dequeue(struct bs_ring* bsr, struct rte_mbuf** obj);
+int bsring_count(struct bs_ring* bsr);
 int bsring_capacity(struct bs_ring* bsr);
 int bsring_bytesused(struct bs_ring* bsr);
 
