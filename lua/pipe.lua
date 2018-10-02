@@ -39,11 +39,27 @@ ffi.cdef [[
 	struct bs_ring { };
 	struct bs_ring* create_bsring(uint32_t capacity, int32_t socket);
 	int bsring_enqueue_bulk(struct bs_ring* bsr, struct rte_mbuf** obj, int n);
+	int bsring_enqueue_burst(struct bs_ring* bsr, struct rte_mbuf** obj, int n);
 	int bsring_enqueue(struct bs_ring* bsr, struct rte_mbuf* obj);
 	int bsring_dequeue_bulk(struct bs_ring* bsr, struct rte_mbuf** obj, int n);
-	int bsring_count(struct bs_ring* r);
+	int bsring_dequeue_burst(struct bs_ring* bsr, struct rte_mbuf** obj, int n);
+	int bsring_dequeue(struct bs_ring* bsr, struct rte_mbuf** obj);
+	int bsring_count(struct bs_ring* bsr);
 	int bsring_capacity(struct bs_ring* bsr);
 	int bsring_bytesused(struct bs_ring* bsr);
+
+	struct ps_ring { };
+	struct ps_ring* create_psring(uint32_t capacity, int32_t socket);
+	int psring_enqueue_bulk(struct ps_ring* psr, struct rte_mbuf** obj, int n);
+	int psring_enqueue_burst(struct ps_ring* psr, struct rte_mbuf** obj, int n);
+	int psring_enqueue(struct ps_ring* psr, struct rte_mbuf* obj);
+	int psring_dequeue_bulk(struct ps_ring* psr, struct rte_mbuf** obj, int n);
+	int psring_dequeue_burst(struct ps_ring* psr, struct rte_mbuf** obj, int n);
+	int psring_dequeue(struct ps_ring* psr, struct rte_mbuf** obj);
+	int psring_count(struct ps_ring* psr);
+	int psring_capacity(struct ps_ring* psr);
+	int psring_bytesused(struct ps_ring* psr);
+
 ]]
 
 local C = ffi.C
@@ -72,7 +88,7 @@ local ENOBUFS = S.c.E.NOBUFS
 
 -- FIXME: this is work-around for some bug with the serialization of nested objects
 function mod:sendToBytesizedRing(ring, bufs, n)
-	return C.bsring_enqueue_bulk(ring, bufs.array, n or bufs.size) > 0
+	return C.bsring_enqueue_bulk(ring, bufs.array, n or bufs.size)
 end
 
 function mod:recvFromBytesizedRing(ring, bufs, n)
