@@ -38,11 +38,11 @@ ffi.cdef [[
 	// Bite-Sized Ring wrapper for DPDK SPSC ring
 	struct bs_ring { };
 	struct bs_ring* create_bsring(uint32_t capacity, int32_t socket);
-	int bsring_enqueue_bulk(struct bs_ring* bsr, struct rte_mbuf** obj, int n);
-	int bsring_enqueue_burst(struct bs_ring* bsr, struct rte_mbuf** obj, int n);
+	int bsring_enqueue_bulk(struct bs_ring* bsr, struct rte_mbuf** obj, uint32_t n);
+	int bsring_enqueue_burst(struct bs_ring* bsr, struct rte_mbuf** obj, uint32_t n);
 	int bsring_enqueue(struct bs_ring* bsr, struct rte_mbuf* obj);
-	int bsring_dequeue_bulk(struct bs_ring* bsr, struct rte_mbuf** obj, int n);
-	int bsring_dequeue_burst(struct bs_ring* bsr, struct rte_mbuf** obj, int n);
+	int bsring_dequeue_bulk(struct bs_ring* bsr, struct rte_mbuf** obj, uint32_t n);
+	int bsring_dequeue_burst(struct bs_ring* bsr, struct rte_mbuf** obj, uint32_t n);
 	int bsring_dequeue(struct bs_ring* bsr, struct rte_mbuf** obj);
 	int bsring_count(struct bs_ring* bsr);
 	int bsring_capacity(struct bs_ring* bsr);
@@ -50,15 +50,14 @@ ffi.cdef [[
 
 	struct ps_ring { };
 	struct ps_ring* create_psring(uint32_t capacity, int32_t socket);
-	int psring_enqueue_bulk(struct ps_ring* psr, struct rte_mbuf** obj, int n);
-	int psring_enqueue_burst(struct ps_ring* psr, struct rte_mbuf** obj, int n);
+	int psring_enqueue_bulk(struct ps_ring* psr, struct rte_mbuf** obj, uint32_t n);
+	int psring_enqueue_burst(struct ps_ring* psr, struct rte_mbuf** obj, uint32_t n);
 	int psring_enqueue(struct ps_ring* psr, struct rte_mbuf* obj);
-	int psring_dequeue_bulk(struct ps_ring* psr, struct rte_mbuf** obj, int n);
-	int psring_dequeue_burst(struct ps_ring* psr, struct rte_mbuf** obj, int n);
+	int psring_dequeue_bulk(struct ps_ring* psr, struct rte_mbuf** obj, uint32_t n);
+	int psring_dequeue_burst(struct ps_ring* psr, struct rte_mbuf** obj, uint32_t n);
 	int psring_dequeue(struct ps_ring* psr, struct rte_mbuf** obj);
 	int psring_count(struct ps_ring* psr);
 	int psring_capacity(struct ps_ring* psr);
-	int psring_bytesused(struct ps_ring* psr);
 
 ]]
 

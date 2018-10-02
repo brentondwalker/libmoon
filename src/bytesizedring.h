@@ -29,11 +29,11 @@ struct bs_ring* create_bsring(uint32_t capacity, int32_t socket);
  * mode it will enqueue whatever there is space for, or dequeue
  * as many as are available, up to n.
  */
-int bsring_enqueue_bulk(struct bs_ring* bsr, struct rte_mbuf** obj, int n);
-int bsring_enqueue_burst(struct bs_ring* bsr, struct rte_mbuf** obj, int n);
+int bsring_enqueue_bulk(struct bs_ring* bsr, struct rte_mbuf** obj, uint32_t n);
+int bsring_enqueue_burst(struct bs_ring* bsr, struct rte_mbuf** obj, uint32_t n);
 int bsring_enqueue(struct bs_ring* bsr, struct rte_mbuf* obj);
-int bsring_dequeue_bulk(struct bs_ring* bsr, struct rte_mbuf** obj, int n);
-int bsring_dequeue_burst(struct bs_ring* bsr, struct rte_mbuf** obj, int n);
+int bsring_dequeue_bulk(struct bs_ring* bsr, struct rte_mbuf** obj, uint32_t n);
+int bsring_dequeue_burst(struct bs_ring* bsr, struct rte_mbuf** obj, uint32_t n);
 int bsring_dequeue(struct bs_ring* bsr, struct rte_mbuf** obj);
 int bsring_count(struct bs_ring* bsr);
 int bsring_capacity(struct bs_ring* bsr);

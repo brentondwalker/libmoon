@@ -18,7 +18,7 @@ struct ps_ring* create_psring(uint32_t capacity, int32_t socket) {
 		printf("WARNING: requested capacity of %d is too large.  Allocating ring of size %d.\n",capacity,PS_RING_SIZE_LIMIT);
 		capacity = PS_RING_SIZE_LIMIT;
 	}
-	int count = 1;
+	uint32_t count = 1;
 	while (count < capacity) {
 		count *= 2;
 	}
@@ -37,21 +37,21 @@ struct ps_ring* create_psring(uint32_t capacity, int32_t socket) {
 	return psr;
 }
 
-int psring_enqueue_bulk(struct ps_ring* psr, struct rte_mbuf** obj, int n) {
+int psring_enqueue_bulk(struct ps_ring* psr, struct rte_mbuf** obj, uint32_t n) {
 	if ((rte_ring_count(psr->ring) + n) < psr->capacity) {
-		return rte_ring_sc_enqueue_bulk(psr->ring, (void**)obj, n, NULL);
+		return rte_ring_sp_enqueue_bulk(psr->ring, (void**)obj, n, NULL);
 	}
 	return 0;
 }
 
-int psring_enqueue_burst(struct ps_ring* psr, struct rte_mbuf** obj, int n) {
-	int count = rte_ring_count(psr->ring);
+int psring_enqueue_burst(struct ps_ring* psr, struct rte_mbuf** obj, uint32_t n) {
+	uint32_t count = rte_ring_count(psr->ring);
 	if (count > psr->capacity) {
 		printf("WARNING: pktsized ring is over capacity: %d > %d\n",count,psr->capacity);
 		return 0;
 	}
-	int num_to_add = ((count + n) > psr->capacity) ? (psr->capacity - count) : n;
-	return rte_ring_sc_enqueue_burst(psr->ring, (void**)obj, num_to_add, NULL);
+	uint32_t num_to_add = ((count + n) > psr->capacity) ? (psr->capacity - count) : n;
+	return rte_ring_sp_enqueue_burst(psr->ring, (void**)obj, num_to_add, NULL);
 }
 
 int psring_enqueue(struct ps_ring* psr, struct rte_mbuf* obj) {
@@ -63,15 +63,15 @@ int psring_enqueue(struct ps_ring* psr, struct rte_mbuf* obj) {
 	return 0;
 }
 
-int psring_dequeue_bulk(struct ps_ring* psr, struct rte_mbuf** obj, int n) {
+int psring_dequeue_bulk(struct ps_ring* psr, struct rte_mbuf** obj, uint32_t n) {
 	return rte_ring_sc_dequeue_bulk(psr->ring, (void**)obj, n, NULL);
 }
 
-int psring_dequeue_burst(struct ps_ring* psr, struct rte_mbuf** obj, int n) {
+int psring_dequeue_burst(struct ps_ring* psr, struct rte_mbuf** obj, uint32_t n) {
 	return rte_ring_sc_dequeue_burst(psr->ring, (void**)obj, n, NULL);
 }
 
-int psring_dequeue(struct ps_ring* psr, struct rte_mbuf** obj, int n) {
+int psring_dequeue(struct ps_ring* psr, struct rte_mbuf** obj) {
 	return (rte_ring_sc_dequeue(psr->ring, (void**)obj) == 0);
 }
 
@@ -81,9 +81,5 @@ int psring_count(struct ps_ring* psr) {
 
 int psring_capacity(struct ps_ring* psr) {
 	return psr->capacity;
-}
-
-int psring_bytesused(struct ps_ring* psr) {
-	return psr->used;
 }
 

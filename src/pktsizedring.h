@@ -27,15 +27,14 @@ struct ps_ring* create_psring(uint32_t capacity, int32_t socket);
  * mode it will enqueue whatever there is space for, or dequeue
  * as many as are available, up to n.
  */
-int psring_enqueue_bulk(struct ps_ring* psr, struct rte_mbuf** obj, int n);
-int psring_enqueue_burst(struct ps_ring* psr, struct rte_mbuf** obj, int n);
+int psring_enqueue_bulk(struct ps_ring* psr, struct rte_mbuf** obj, uint32_t n);
+int psring_enqueue_burst(struct ps_ring* psr, struct rte_mbuf** obj, uint32_t n);
 int psring_enqueue(struct ps_ring* psr, struct rte_mbuf* obj);
-int psring_dequeue_bulk(struct ps_ring* psr, struct rte_mbuf** obj, int n);
-int psring_dequeue_burst(struct ps_ring* psr, struct rte_mbuf** obj, int n);
+int psring_dequeue_bulk(struct ps_ring* psr, struct rte_mbuf** obj, uint32_t n);
+int psring_dequeue_burst(struct ps_ring* psr, struct rte_mbuf** obj, uint32_t n);
 int psring_dequeue(struct ps_ring* psr, struct rte_mbuf** obj);
 int psring_count(struct ps_ring* psr);
 int psring_capacity(struct ps_ring* psr);
-int psring_bytesused(struct ps_ring* psr);
 
 
 #ifdef __cplusplus
