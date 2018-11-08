@@ -30,6 +30,7 @@ SET(FILES
 	src/timestamping_ixgbe
 	src/timestamping_igb
 	src/bytesizedring
+	src/pktsizedring
 )
 
 SET(DPDK_LIBS
