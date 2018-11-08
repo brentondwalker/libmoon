@@ -107,7 +107,6 @@ int bsring_enqueue_burst(struct bs_ring* bsr, struct rte_mbuf** obj, uint32_t n)
 	return num_added;
 }
 
-
 int bsring_enqueue(struct bs_ring* bsr, struct rte_mbuf* obj) {
 	if ((bsr->used + obj->pkt_len) < bsr->capacity) {
 		if (rte_ring_sp_enqueue(bsr->ring, obj) == 0) {

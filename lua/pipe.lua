@@ -87,11 +87,11 @@ local ENOBUFS = S.c.E.NOBUFS
 
 -- FIXME: this is work-around for some bug with the serialization of nested objects
 function mod:sendToBytesizedRing(ring, bufs, n)
-	return C.bsring_enqueue_bulk(ring, bufs.array, n or bufs.size)
+	return C.bsring_enqueue_burst(ring, bufs.array, n or bufs.size)
 end
 
 function mod:recvFromBytesizedRing(ring, bufs, n)
-	return C.bsring_dequeue_bulk(ring, bufs.array, n or bufs.size)
+	return C.bsring_dequeue_burst(ring, bufs.array, n or bufs.size)
 end
 
 function mod:countBytesizedRing(ring)
@@ -109,12 +109,12 @@ end
 
 -- try to enqueue packets in a ring, returns true on success
 function bytesizedRing:send(bufs)
-	return C.bsring_enqueue_bulk(self.ring, bufs.array, bufs.size) > 0
+	return C.bsring_enqueue_burst(self.ring, bufs.array, bufs.size) > 0
 end
 
 -- try to enqueue packets in a ring, returns true on success
 function bytesizedRing:sendN(bufs, n)
-	return C.bsring_enqueue_bulk(self.ring, bufs.array, n) > 0
+	return C.bsring_enqueue_burst(self.ring, bufs.array, n) > 0
 end
 
 function bytesizedRing:recv(bufs)
@@ -126,6 +126,68 @@ function bytesizedRing:__serialize()
 end
 
 -- ====================================================================================================
+
+
+-- ====================================================================================================
+
+mod.pktsizedRing = {}
+local pktsizedRing = mod.pktsizedRing
+pktsizedRing.__index = pktsizedRing
+
+function mod:newPktsizedRing(capacity, socket)
+	size = size or 512
+	socket = socket or -1
+	return setmetatable({
+		ring = C.create_psring(capacity, socket)
+	}, pktsizedRing)
+end
+
+function mod:newPktsizedRingFromRing(ring)
+	return setmetatable({
+		ring = ring
+	}, pktsizedRing)
+end
+
+local ENOBUFS = S.c.E.NOBUFS
+
+-- FIXME: this is work-around for some bug with the serialization of nested objects
+function mod:sendToPktsizedRing(ring, bufs, n)
+	return C.psring_enqueue_burst(ring, bufs.array, n or bufs.size)
+end
+
+function mod:recvFromPktsizedRing(ring, bufs, n)
+	return C.psring_dequeue_burst(ring, bufs.array, n or bufs.size)
+end
+
+function mod:countPktsizedRing(ring)
+	return C.psring_count(ring)
+end
+
+function mod:capacityPktsizedRing(ring)
+	return C.psring_capacity(ring)
+end
+
+-- try to enqueue packets in a ring, returns true on success
+function pktsizedRing:send(bufs)
+	return C.psring_enqueue_burst(self.ring, bufs.array, bufs.size) > 0
+end
+
+-- try to enqueue packets in a ring, returns true on success
+function pktsizedRing:sendN(bufs, n)
+	return C.psring_enqueue_burst(self.ring, bufs.array, n) > 0
+end
+
+function pktsizedRing:recv(bufs)
+	error("NYI")
+end
+
+function pktsizedRing:__serialize()
+	return "require'pipe'; return " .. serpent.addMt(serpent.dumpRaw(self), "require('pipe').pktsizedRing"), true
+end
+
+-- ====================================================================================================
+
+
 
 mod.packetRing = {}
 local packetRing = mod.packetRing
