@@ -24,16 +24,13 @@ struct ps_ring* create_psring(uint32_t capacity, int32_t socket) {
 	}
 	char ring_name[32];
 	struct ps_ring* psr = (struct ps_ring*)malloc(sizeof(struct ps_ring*));
-	printf("create_psring(%d,%d)\n",capacity,socket);
 	psr->capacity = capacity;
 	sprintf(ring_name, "mbuf_ps_ring%d", __sync_fetch_and_add(&ring_cnt, 1));
 	psr->ring = rte_ring_create(ring_name, count, socket, RING_F_SP_ENQ | RING_F_SC_DEQ);
-	printf("requested ring capacity: %d\tactual ring capacity: %d\tring size: %d\n",count,rte_ring_get_capacity(psr->ring),rte_ring_get_size(psr->ring));
 	if (! psr->ring) {
 		free(psr);
 		return NULL;
 	}
-	printf("returning psr\n");
 	return psr;
 }
 
@@ -47,7 +44,7 @@ int psring_enqueue_bulk(struct ps_ring* psr, struct rte_mbuf** obj, uint32_t n) 
 int psring_enqueue_burst(struct ps_ring* psr, struct rte_mbuf** obj, uint32_t n) {
 	uint32_t count = rte_ring_count(psr->ring);
 	if (count > psr->capacity) {
-		printf("WARNING: pktsized ring is over capacity: %d > %d\n",count,psr->capacity);
+		// pktsized ring is over capacity
 		return 0;
 	}
 	uint32_t num_to_add = ((count + n) > psr->capacity) ? (psr->capacity - count) : n;
@@ -57,8 +54,6 @@ int psring_enqueue_burst(struct ps_ring* psr, struct rte_mbuf** obj, uint32_t n)
 int psring_enqueue(struct ps_ring* psr, struct rte_mbuf* obj) {
 	if ((rte_ring_count(psr->ring) + 1) <= psr->capacity) {
 		return (rte_ring_sp_enqueue(psr->ring, obj) == 0);
-	} else {
-		printf("psring_enqueue(): cannot add, ring is full with %d frames \t%d\n",rte_ring_count(psr->ring),psr->capacity);
 	}
 	return 0;
 }

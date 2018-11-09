@@ -20,11 +20,9 @@ struct bs_ring* create_bsring(uint32_t capacity, int32_t socket) {
 	}
 	char ring_name[32];
 	struct bs_ring* bsr = (struct bs_ring*)malloc(sizeof(struct bs_ring*));
-	printf("create_bsring(%d,%d)\n",capacity,socket);
 	bsr->capacity = capacity;
 	sprintf(ring_name, "mbuf_bs_ring%d", __sync_fetch_and_add(&ring_cnt, 1));
 	bsr->ring = rte_ring_create(ring_name, count, socket, RING_F_SP_ENQ | RING_F_SC_DEQ);
-	printf("requested ring capacity: %d\tactual ring capacity: %d\tring size: %d\n",count,rte_ring_get_capacity(bsr->ring),rte_ring_get_size(bsr->ring));
 	bsr->used = 0;
 	rte_rwlock_init(&(bsr->used_lock));
 	if (! bsr->ring) {
@@ -117,8 +115,6 @@ int bsring_enqueue(struct bs_ring* bsr, struct rte_mbuf* obj) {
 		} else {
 			printf("bsring_enqueue(): rte_ring_sp_enqueue failed");
 		}
-	} else {
-		printf("bsring_enqueue(): cannot add, ring is full with %d frames \t%d\t%d\n",rte_ring_count(bsr->ring),bsr->used,bsr->capacity);
 	}
 	return 0;
 }
