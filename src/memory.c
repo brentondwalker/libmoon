@@ -28,9 +28,8 @@ struct rte_mempool* init_mem(uint32_t nb_mbuf, uint32_t socket, uint32_t mbuf_si
 	return pool;
 }
 
-struct rte_mbuf* alloc_mbuf(struct rte_mempool* mp) {
-	struct rte_mbuf* res = rte_pktmbuf_alloc(mp);
-	return res;
+struct rte_mbuf* rte_pktmbuf_alloc_export(struct rte_mempool* mp) {
+	return rte_pktmbuf_alloc(mp);
 }
 
 void alloc_mbufs(struct rte_mempool* mp, struct rte_mbuf* bufs[], uint32_t len, uint16_t pkt_len) {
@@ -47,18 +46,21 @@ void alloc_mbufs(struct rte_mempool* mp, struct rte_mbuf* bufs[], uint32_t len, 
 				bufs[i]->pkt_len = pkt_len;
 				bufs[i]->data_len = pkt_len;
 				i++;
+				// fall through
 			case 3:
 				rte_mbuf_refcnt_set(bufs[i], 1);
 				rte_pktmbuf_reset(bufs[i]);
 				bufs[i]->pkt_len = pkt_len;
 				bufs[i]->data_len = pkt_len;
 				i++;
+				// fall through
 			case 2:
 				rte_mbuf_refcnt_set(bufs[i], 1);
 				rte_pktmbuf_reset(bufs[i]);
 				bufs[i]->pkt_len = pkt_len;
 				bufs[i]->data_len = pkt_len;
 				i++;
+				// fall through
 			case 1:
 				rte_mbuf_refcnt_set(bufs[i], 1);
 				rte_pktmbuf_reset(bufs[i]);
@@ -76,6 +78,14 @@ uint16_t rte_mbuf_refcnt_read_export(struct rte_mbuf* m) {
 
 uint16_t rte_mbuf_refcnt_update_export(struct rte_mbuf* m, int16_t value) {
 	return rte_mbuf_refcnt_update(m, value);
+}
+
+char *rte_pktmbuf_adj_export(struct rte_mbuf *m, uint16_t len) {
+	return rte_pktmbuf_adj(m, len);
+}
+
+int rte_pktmbuf_trim_export(struct rte_mbuf *m, uint16_t len) {
+	return rte_pktmbuf_trim(m, len);
 }
 
 
