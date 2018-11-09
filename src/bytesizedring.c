@@ -31,7 +31,6 @@ struct bs_ring* create_bsring(uint32_t capacity, int32_t socket) {
 		free(bsr);
 		return NULL;
 	}
-	printf("returning bsr\n");
 	return bsr;
 }
 
@@ -76,6 +75,7 @@ int bsring_enqueue_burst(struct bs_ring* bsr, struct rte_mbuf** obj, uint32_t n)
 	while ((i < n) && (bytes_remaining > 0)) {
 		bytes_remaining -= (obj[i]->pkt_len);
 		num_to_add++;
+		i++;
 	}
 	
 	num_added = rte_ring_sp_enqueue_burst(bsr->ring, (void**)obj, num_to_add, NULL);
