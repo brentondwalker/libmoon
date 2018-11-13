@@ -55,11 +55,6 @@ int bsring_enqueue_bulk(struct bs_ring* bsr, struct rte_mbuf** obj, uint32_t n) 
 	}
 
 	bsr->bytes_used += total_size;
-	if (bsr->bytes_used > bsr->capacity) {
-		uint32_t bu = bsr->bytes_used;
-		printf("WARNING: bsring_enqueue_bulk(): bsring is overfilled %u\n",bu);
-	}
-
 	return num_added;
 }
 
@@ -71,7 +66,6 @@ int bsring_enqueue_burst(struct bs_ring* bsr, struct rte_mbuf** obj, uint32_t n)
 	// in burst mode we add as many packets as will fit.
 	// count how many packets we can add from the start of this batch.
 	uint32_t i = 0;
-	uint32_t initial_bytes_used = bsr->bytes_used;
 	int bytes_remaining = bsr->capacity - bsr->bytes_used;
 	while ((i < n) && (bytes_remaining > 0)) {
 		bytes_remaining -= (obj[i]->pkt_len);
@@ -105,12 +99,6 @@ int bsring_enqueue_burst(struct bs_ring* bsr, struct rte_mbuf** obj, uint32_t n)
 	}
 	
 	bsr->bytes_used += bytes_added;
-
-	if (bsr->bytes_used > bsr->capacity) {
-		uint32_t bu = bsr->bytes_used;
-		printf("WARNING: bsring_enqueue_burst(): bsring is overfilled %u\n",bu);
-	}
-
 	return num_added;
 }
 
@@ -122,10 +110,6 @@ int bsring_enqueue(struct bs_ring* bsr, struct rte_mbuf* obj) {
 		} else {
 			printf("bsring_enqueue(): rte_ring_sp_enqueue failed\n");
 		}
-	}
-	if (bsr->bytes_used > bsr->capacity) {
-		uint32_t bu = bsr->bytes_used;
-		printf("WARNING: bsring_enqueue(): bsring is overfilled %u\n",bu);
 	}
 	return 0;
 }
