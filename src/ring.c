@@ -29,7 +29,6 @@ int ring_count(struct rte_ring* r) {
 	return rte_ring_count(r);
 }
 
-
 int ring_free_count(struct rte_ring* r) {
 	return rte_ring_free_count(r);
 }
