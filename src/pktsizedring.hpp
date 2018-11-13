@@ -1,11 +1,12 @@
 #ifndef MG_PKTSIZEDRING_H
 #define MG_PKTSIZEDRING_H
 
+#include <cstdint>
+
 #include <rte_config.h>
 #include <rte_common.h>
 #include <rte_ring.h>
 #include <rte_mbuf.h>
-#include <rte_rwlock.h>
 
 #ifdef __cplusplus
 extern "C" {

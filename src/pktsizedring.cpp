@@ -3,7 +3,7 @@
 #include <rte_ring.h>
 #include <rte_rwlock.h>
 #include <stdio.h>
-#include "pktsizedring.h"
+#include "pktsizedring.hpp"
 
 // DPDK SPSC bounded ring buffer
 /*
