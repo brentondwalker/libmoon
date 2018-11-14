@@ -29,7 +29,6 @@ ffi.cdef [[
 	
 	// DPDK SPSC ring
 	struct rte_ring { };
-	//struct rte_mbuf { };
 	struct rte_ring* create_ring(uint32_t count, int32_t socket);
 	void free_ring(struct rte_ring* r);
 	int ring_enqueue(struct rte_ring* r, struct rte_mbuf** obj, int n);
