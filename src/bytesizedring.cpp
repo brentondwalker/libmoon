@@ -1,6 +1,7 @@
 #include <rte_config.h>
 #include <rte_common.h>
 #include <rte_ring.h>
+#include <rte_mbuf.h>
 #include <stdio.h>
 #include "bytesizedring.hpp"
 
@@ -14,8 +15,16 @@ struct bs_ring* create_bsring(uint32_t capacity, int32_t socket) {
 	static volatile uint32_t ring_cnt = 0;
 	int count_min = capacity/60;
 	int count = 1;
-	while (count < count_min && count <= BS_RING_SIZE_LIMIT) {
+	
+	// DPDK ring buffers come with sizes of 2^n, but the actual storage limit
+	// is (2^n - 1).  Therefore always request a ring that will hold our
+	// desired size plus 1.
+	while ((count-1) < count_min && count <= BS_RING_SIZE_LIMIT) {
 		count *= 2;
+	}
+	if (count > BS_RING_SIZE_LIMIT) {
+		printf("WARNING: create_bsring(): could not allocate a large enough ring.\n");
+		count /= 2;
 	}
 	char ring_name[32];
 	struct bs_ring* bsr = (struct bs_ring*)malloc(sizeof(struct bs_ring));
@@ -42,11 +51,28 @@ int bsring_enqueue_bulk(struct bs_ring* bsr, struct rte_mbuf** obj, uint32_t n) 
 		total_size += obj[i]->pkt_len;
 	}
 	if ((bsr->bytes_used + total_size) > bsr->capacity) {
+		// the mbufs will be dropped.  Free them.
+		for (uint32_t i=0; i<n; i++) {
+			rte_pktmbuf_free(obj[i]);
+			obj[i] = NULL;
+		}
 		return 0;
 	}
 
 	// there should be space available.  Do a bulk enqueue.
 	num_added = rte_ring_sp_enqueue_bulk(bsr->ring, (void**)obj, n, NULL);
+
+	if (num_added < n) {
+		// this should not happen
+		printf("WARNING: bsring_enqueue_bulk(): some mbufs failed to enqueue\n");
+
+		// free any remaining mbufs that didn't make it in.
+		for (uint32_t i=num_added; i<n; i++) {
+			rte_pktmbuf_free(obj[i]);
+			obj[i] = NULL;
+		}
+	}
+
 
 	// adjust the bsring's usage values
 	total_size = 0;
@@ -81,23 +107,35 @@ int bsring_enqueue_burst(struct bs_ring* bsr, struct rte_mbuf** obj, uint32_t n)
 		bytes_added += (obj[i]->pkt_len);
 	}
 
-	// it's possible that some of the remaining packets are small enough
+	// free any mbufs that didn't make it in.
+	for (uint32_t i=num_added; i<num_to_add; i++) {
+		rte_pktmbuf_free(obj[i]);
+		obj[i] = NULL;
+	}
+
+
+	// It's possible that some of the remaining frames are small enough
 	// to fit into the remaining space.  Try them iteratively.
+	// Free any mbufs that don't get added
 	if (num_added < n) {
 		bytes_remaining = bsr->capacity - bsr->bytes_used - bytes_added;
 		i = num_to_add;
 		while ((i < n) && (bytes_remaining >= 60)) {
-			if ((int)(obj[i]->pkt_len) <= bytes_remaining) {
-				if (rte_ring_sp_enqueue(bsr->ring, obj[i])) {
-					num_added++;
-					bytes_added += (obj[i]->pkt_len);
-					bytes_remaining -= (obj[i]->pkt_len);
-				}
+			if (((int)(obj[i]->pkt_len) <= bytes_remaining)
+				&& (rte_ring_sp_enqueue(bsr->ring, obj[i]))) {
+				num_added++;
+				bytes_added += (obj[i]->pkt_len);
+				bytes_remaining -= (obj[i]->pkt_len);
+			} else {
+				rte_pktmbuf_free(obj[i]);
+				obj[i] = NULL;
 			}
 			i++;
 		}
 	}
 	
+	// XXX - We could be incrementing bsr->bytes_used as we enqueue
+	//       the mbufs instead of adding them all at the end.
 	bsr->bytes_used += bytes_added;
 	return num_added;
 }
@@ -108,9 +146,11 @@ int bsring_enqueue(struct bs_ring* bsr, struct rte_mbuf* obj) {
 			bsr->bytes_used += (obj->pkt_len);
 			return 1;
 		} else {
+			// this shouldn't happen
 			printf("bsring_enqueue(): rte_ring_sp_enqueue failed\n");
 		}
 	}
+	rte_pktmbuf_free(obj);
 	return 0;
 }
 
