@@ -59,6 +59,18 @@ ffi.cdef [[
 	int psring_count(struct ps_ring* psr);
 	int psring_capacity(struct ps_ring* psr);
 
+	struct bstx_ring { };
+	struct bstx_ring* create_bstxring(uint32_t capacity, int32_t socket, uint16_t port);
+	int bstxring_enqueue_bulk(struct bstx_ring* bsr, struct rte_mbuf** obj, uint32_t n);
+	int bstxring_enqueue_burst(struct bstx_ring* bsr, struct rte_mbuf** obj, uint32_t n);
+	int bstxring_enqueue(struct bstx_ring* bsr, struct rte_mbuf* obj);
+	int bstxring_dequeue_bulk(struct bstx_ring* bsr, struct rte_mbuf** obj, uint32_t n);
+	int bstxring_dequeue_burst(struct bstx_ring* bsr, struct rte_mbuf** obj, uint32_t n);
+	int bstxring_dequeue(struct bstx_ring* bsr, struct rte_mbuf** obj);
+	int bstxring_count(struct bstx_ring* bsr);
+	int bstxring_capacity(struct bstx_ring* bsr);
+	int bstxring_bytesused(struct bstx_ring* bsr);
+
 	int ring_free_count(struct rte_ring* r);
 	bool ring_empty(struct rte_ring* r);
 	bool ring_full(struct rte_ring* r);
@@ -126,6 +138,71 @@ end
 
 function bytesizedRing:__serialize()
 	return "require'pipe'; return " .. serpent.addMt(serpent.dumpRaw(self), "require('pipe').bytesizedRing"), true
+end
+
+-- ====================================================================================================
+
+
+-- ====================================================================================================
+
+mod.bytesizedtxRing = {}
+local bytesizedtxRing = mod.bytesizedtxRing
+bytesizedtxRing.__index = bytesizedtxRing
+
+function mod:newBytesizedtxRing(capacity, socket, port)
+	size = size or (1524*512)
+	socket = socket or -1
+	return setmetatable({
+		ring = C.create_bstxring(capacity, socket, port)
+	}, bytesizedtxRing)
+end
+
+function mod:newBytesizedtxRingFromRing(ring)
+	return setmetatable({
+		ring = ring
+	}, bytesizedtxRing)
+end
+
+local ENOBUFS = S.c.E.NOBUFS
+
+-- FIXME: this is work-around for some bug with the serialization of nested objects
+function mod:sendToBytesizedtxRing(ring, bufs, n)
+	return C.bstxring_enqueue_burst(ring, bufs.array, n or bufs.size)
+end
+
+function mod:recvFromBytesizedtxRing(ring, bufs, n)
+	return C.bstxring_dequeue_burst(ring, bufs.array, n or bufs.size)
+end
+
+function mod:countBytesizedtxRing(ring)
+	return C.bstxring_count(ring)
+end
+
+function mod:capacityBytesizedtxRing(ring)
+	return C.bstxring_capacity(ring)
+end
+
+function mod:bytesusedBytesizedtxRing(ring)
+	return C.bstxring_bytesused(ring)
+end
+
+
+-- try to enqueue packets in a ring, returns true on success
+function bytesizedtxRing:send(bufs)
+	return C.bstxring_enqueue_burst(self.ring, bufs.array, bufs.size) > 0
+end
+
+-- try to enqueue packets in a ring, returns true on success
+function bytesizedtxRing:sendN(bufs, n)
+	return C.bstxring_enqueue_burst(self.ring, bufs.array, n) > 0
+end
+
+function bytesizedtxRing:recv(bufs)
+	error("NYI")
+end
+
+function bytesizedtxRing:__serialize()
+	return "require'pipe'; return " .. serpent.addMt(serpent.dumpRaw(self), "require('pipe').bytesizedtxRing"), true
 end
 
 -- ====================================================================================================

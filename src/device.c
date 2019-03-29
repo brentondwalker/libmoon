@@ -233,6 +233,18 @@ uint32_t dpdk_get_rte_queue_stat_cntrs_num() {
 	return RTE_ETHDEV_QUEUE_STAT_CNTRS;
 }
 
+// these functions check how many mbufs are waiting in the
+// RX and TX queues on the device
+int rte_eth_rx_queue_count_export(uint8_t port_id, uint16_t queue_id) {
+	return rte_eth_rx_queue_count(port_id, queue_id);
+}
+
+// this function doesn't exist in DPDK!
+//int rte_eth_tx_queue_count_export(uint8_t port_id, uint16_t queue_id) {
+//	return rte_eth_tx_queue_count(port_id, queue_id);
+//}
+
+
 // the following functions are static inline function in header files
 // this is the easiest/least ugly way to make them available to luajit (#defining static before including the header breaks stuff)
 uint16_t rte_eth_rx_burst_export(uint8_t port_id, uint16_t queue_id, void* rx_pkts, uint16_t nb_pkts) {

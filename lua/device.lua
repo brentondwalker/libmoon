@@ -841,6 +841,16 @@ function rxQueue:recv(bufArray, numpkts)
 	return 0
 end
 
+-- Count the number of mbufs waiting in an RX queue on a device
+function rxQueue:count()
+	return dpdkc.rte_eth_rx_queue_count_export(self.id, self.qid)
+end
+
+-- Count the number of mbufs waiting in an TX queue on a device
+function txQueue:count()
+	return dpdkc.rte_eth_tx_queue_count_export(self.id, self.qid)
+end
+
 --- Receive packets from a rx queue and save timestamps in the udata64 field.
 --- Returns as soon as at least one packet is available.
 function rxQueue:recvWithTimestamps(bufArray, numpkts)

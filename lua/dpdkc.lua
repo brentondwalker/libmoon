@@ -289,7 +289,9 @@ ffi.cdef[[
 	// stats
 	uint32_t dpdk_get_rte_queue_stat_cntrs_num();
 	int rte_eth_stats_get(uint8_t port_id, void* stats);
-	
+	int rte_eth_rx_queue_count_export(uint8_t port_id, uint16_t queue_id);
+	//int rte_eth_tx_queue_count_export(uint8_t port_id, uint16_t queue_id);
+
 	// checksum offloading
 	void calc_ipv4_pseudo_header_checksum(void* data, int offset);
 	void calc_ipv4_pseudo_header_checksums(struct rte_mbuf** pkts, uint16_t num_pkts, int offset);
