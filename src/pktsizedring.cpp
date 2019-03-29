@@ -2,6 +2,7 @@
 #include <rte_common.h>
 #include <rte_ring.h>
 #include <rte_rwlock.h>
+#include <rte_mbuf.h>
 #include <stdio.h>
 #include "pktsizedring.hpp"
 
@@ -19,11 +20,15 @@ struct ps_ring* create_psring(uint32_t capacity, int32_t socket) {
 		capacity = PS_RING_SIZE_LIMIT;
 	}
 	uint32_t count = 1;
-	while (count < capacity) {
+
+	// DPDK ring buffers come with sizes of 2^n, but actual storage limit is (2^n - 1).
+	// Therefore if someone reqests a pktsized ring of size 8, for example, we need to
+	// allocate one of size 16.
+	while (count < (capacity+1)) {
 		count *= 2;
 	}
 	char ring_name[32];
-	struct ps_ring* psr = (struct ps_ring*)malloc(sizeof(struct ps_ring*));
+	struct ps_ring* psr = (struct ps_ring*)malloc(sizeof(struct ps_ring));
 	psr->capacity = capacity;
 	sprintf(ring_name, "mbuf_ps_ring%d", __sync_fetch_and_add(&ring_cnt, 1));
 	psr->ring = rte_ring_create(ring_name, count, socket, RING_F_SP_ENQ | RING_F_SC_DEQ);
@@ -48,13 +53,24 @@ int psring_enqueue_burst(struct ps_ring* psr, struct rte_mbuf** obj, uint32_t n)
 		return 0;
 	}
 	uint32_t num_to_add = ((count + n) > psr->capacity) ? (psr->capacity - count) : n;
-	return rte_ring_sp_enqueue_burst(psr->ring, (void**)obj, num_to_add, NULL);
+	int num_added = rte_ring_sp_enqueue_burst(psr->ring, (void**)obj, num_to_add, NULL);
+
+	// free the remaining mbufs that didn't make it in.
+	for (uint32_t i=num_added; i<n; i++) {
+		rte_pktmbuf_free(obj[i]);
+		obj[i] = NULL;
+	}
+	
+	return num_added;
 }
 
 int psring_enqueue(struct ps_ring* psr, struct rte_mbuf* obj) {
 	if ((rte_ring_count(psr->ring) + 1) <= psr->capacity) {
-		return (rte_ring_sp_enqueue(psr->ring, obj) == 0);
+		if (rte_ring_sp_enqueue(psr->ring, obj) == 0) {
+			return 1;
+		}
 	}
+	rte_pktmbuf_free(obj);
 	return 0;
 }
 

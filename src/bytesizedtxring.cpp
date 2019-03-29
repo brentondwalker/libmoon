@@ -1,17 +1,20 @@
 #include <rte_config.h>
 #include <rte_common.h>
 #include <rte_ring.h>
+#include <rte_ethdev.h>
 #include <rte_mbuf.h>
 #include <stdio.h>
-#include "bytesizedring.hpp"
+#include "bytesizedtxring.hpp"
 
 // DPDK SPSC bounded ring buffer
 /*
  * This wraps the DPDK SPSC bounded ring buffer into a structure whose capacity
- * limits the number of bytes it can hold.
+ * limits the number of bytes it can hold.  This ring is intended to be coupled
+ * to a device's TX queue, so that mbufs in the TX queue are still counted
+ * as being enqueued here.
  */
 
-struct bs_ring* create_bsring(uint32_t capacity, int32_t socket) {
+struct bstx_ring* create_bstxring(uint32_t capacity, int32_t socket, uint16_t port) {
 	static volatile uint32_t ring_cnt = 0;
 	int count_min = capacity/60;
 	int count = 1;
@@ -19,17 +22,17 @@ struct bs_ring* create_bsring(uint32_t capacity, int32_t socket) {
 	// DPDK ring buffers come with sizes of 2^n, but the actual storage limit
 	// is (2^n - 1).  Therefore always request a ring that will hold our
 	// desired size plus 1.
-	while ((count-1) < count_min && count <= BS_RING_SIZE_LIMIT) {
+	while ((count-1) < count_min && count <= BSTX_RING_SIZE_LIMIT) {
 		count *= 2;
 	}
-	if (count > BS_RING_SIZE_LIMIT) {
+	if (count > BSTX_RING_SIZE_LIMIT) {
 		printf("WARNING: create_bsring(): could not allocate a large enough ring.\n");
 		count /= 2;
 	}
 	char ring_name[32];
-	struct bs_ring* bsr = (struct bs_ring*)malloc(sizeof(struct bs_ring));
+	struct bstx_ring* bsr = (struct bstx_ring*)malloc(sizeof(struct bstx_ring));
 	bsr->capacity = capacity;
-	sprintf(ring_name, "mbuf_bs_ring%d", __sync_fetch_and_add(&ring_cnt, 1));
+	sprintf(ring_name, "mbuf_bstx_ring%d", __sync_fetch_and_add(&ring_cnt, 1));
 	bsr->ring = rte_ring_create(ring_name, count, socket, RING_F_SP_ENQ | RING_F_SC_DEQ);
 	bsr->bytes_used = 0;
 
@@ -37,10 +40,40 @@ struct bs_ring* create_bsring(uint32_t capacity, int32_t socket) {
 		free(bsr);
 		return NULL;
 	}
+
+	// set a tx callback so we can account for the mbufs that gets sent
+	rte_eth_add_tx_callback(port, 0, bstxring_decrement_callback, NULL);
+
 	return bsr;
 }
 
-int bsring_enqueue_bulk(struct bs_ring* bsr, struct rte_mbuf** obj, uint32_t n) {
+static uint16_t bstxring_decrement_callback(uint8_t port __rte_unused, uint16_t qidx __rte_unused,
+                struct rte_mbuf **pkts, uint16_t nb_pkts, void *_ __rte_unused)
+{
+		struct ether_hdr *eth;
+		uint32_t total_sent = 0;
+        uint16_t i;
+
+		printf("bstxring_decrement_callback(%d)\n",nb_pkts);
+		
+        for (i = 0; i<nb_pkts; i++) {
+			eth = rte_pktmbuf_mtod(pkts[i], struct ether_hdr *);
+			// the dummy frames seem to have dest addr 07:08:09:0a:0b:0c
+			if (eth->d_addr.addr_bytes[0]!=0x07 || eth->d_addr.addr_bytes[1]!=0x08 || eth->d_addr.addr_bytes[2]!=0x09) {
+				printf("%d\t%d\t%02x:%02x:%02x:%02x:%02x:%02x\t%d\n", i, nb_pkts,
+						eth->d_addr.addr_bytes[0],eth->d_addr.addr_bytes[1],
+						eth->d_addr.addr_bytes[2],eth->d_addr.addr_bytes[3],
+						eth->d_addr.addr_bytes[4],eth->d_addr.addr_bytes[5],
+						pkts[i]->pkt_len);
+				total_sent += pkts[i]->pkt_len;
+			}
+		}
+		
+        return nb_pkts;
+}
+
+
+int bstxring_enqueue_bulk(struct bstx_ring* bsr, struct rte_mbuf** obj, uint32_t n) {
 	uint32_t num_added = 0;
 
 	// in bulk mode we either add all or nothing.
@@ -84,7 +117,7 @@ int bsring_enqueue_bulk(struct bs_ring* bsr, struct rte_mbuf** obj, uint32_t n) 
 	return num_added;
 }
 
-int bsring_enqueue_burst(struct bs_ring* bsr, struct rte_mbuf** obj, uint32_t n) {
+int bstxring_enqueue_burst(struct bstx_ring* bsr, struct rte_mbuf** obj, uint32_t n) {
 	uint32_t num_to_add = 0;
 	uint32_t num_added = 0;
 	uint32_t bytes_added = 0;
@@ -140,7 +173,7 @@ int bsring_enqueue_burst(struct bs_ring* bsr, struct rte_mbuf** obj, uint32_t n)
 	return num_added;
 }
 
-int bsring_enqueue(struct bs_ring* bsr, struct rte_mbuf* obj) {
+int bstxring_enqueue(struct bstx_ring* bsr, struct rte_mbuf* obj) {
 	if ((bsr->bytes_used + obj->pkt_len) < bsr->capacity) {
 		if (rte_ring_sp_enqueue(bsr->ring, obj) == 0) {
 			bsr->bytes_used += (obj->pkt_len);
@@ -154,18 +187,19 @@ int bsring_enqueue(struct bs_ring* bsr, struct rte_mbuf* obj) {
 	return 0;
 }
 
-int bsring_dequeue_burst(struct bs_ring* bsr, struct rte_mbuf** obj, uint32_t n) {
+int bstxring_dequeue_burst(struct bstx_ring* bsr, struct rte_mbuf** obj, uint32_t n) {
 	uint32_t num_dequeued = rte_ring_sc_dequeue_burst(bsr->ring, (void**)obj, n, NULL);
 	uint32_t i = 0;
 	if (num_dequeued > 0) {
 		for (i=0; i<num_dequeued; i++) {
 			bsr->bytes_used -= (obj[i]->pkt_len);
 		}
+		printf("bstxring_dequeue_burst\t%d\n",num_dequeued);
 	}
 	return num_dequeued;
 }
 
-int bsring_dequeue_bulk(struct bs_ring* bsr, struct rte_mbuf** obj, uint32_t n) {
+int bstxring_dequeue_bulk(struct bstx_ring* bsr, struct rte_mbuf** obj, uint32_t n) {
 	uint32_t num_dequeued = rte_ring_sc_dequeue_bulk(bsr->ring, (void**)obj, n, NULL);
 	uint32_t i = 0;
 	if (num_dequeued > 0) {
@@ -176,7 +210,7 @@ int bsring_dequeue_bulk(struct bs_ring* bsr, struct rte_mbuf** obj, uint32_t n) 
 	return num_dequeued;
 }
 
-int bsring_dequeue(struct bs_ring* bsr, struct rte_mbuf** obj) {
+int bstxring_dequeue(struct bstx_ring* bsr, struct rte_mbuf** obj) {
 	if (rte_ring_sc_dequeue(bsr->ring, (void**)obj) == 0) {
 		bsr->bytes_used -= (obj[0]->pkt_len);
 		return 1;
@@ -184,15 +218,15 @@ int bsring_dequeue(struct bs_ring* bsr, struct rte_mbuf** obj) {
 	return 0;
 }
 
-int bsring_count(struct bs_ring* bsr) {
+int bstxring_count(struct bstx_ring* bsr) {
 	return rte_ring_count(bsr->ring);
 }
 
-int bsring_capacity(struct bs_ring* bsr) {
+int bstxring_capacity(struct bstx_ring* bsr) {
 	return bsr->capacity;
 }
 
-int bsring_bytesused(struct bs_ring* bsr) {
+int bstxring_bytesused(struct bstx_ring* bsr) {
 	return bsr->bytes_used;
 }
 
