@@ -15,6 +15,7 @@ extern "C" {
 #endif
 
 #define BS_RING_SIZE_LIMIT 268435455
+#define FRAME_OVERHEAD 24
 
 struct bs_ring
 {
@@ -38,6 +39,7 @@ struct bs_ring
 	 * to suffer.
 	 */
 	std::atomic<uint32_t> bytes_used;
+	std::atomic<bool> ring_locked;
 };
 
 struct bs_ring* create_bsring(uint32_t capacity, int32_t socket);

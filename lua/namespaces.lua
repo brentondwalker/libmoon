@@ -51,7 +51,30 @@ function namespace:__index(key)
 		return C.namespace_get_lock(self)
 	end
 	local val = C.namespace_retrieve(self, key)
-	return val ~= nil and loadstring(ffi.string(val))() or nil
+	if (val == nil) then
+		return nil
+	end
+	local ffisval = ffi.string(val)
+	if (ffisval == nil) then
+		--print("** got ffi.string = nil!",key,val)
+		return nil
+	end
+	local lsffisval = loadstring(ffisval)
+	if (lsffisval == nil) then
+		--print("** ** got loadstring(ffi.string) = nil!",key,val,ffisval)
+		val = C.namespace_retrieve(self, key)
+		ffisval = ffi.string(val)
+		lsffisval = loadstring(ffisval)
+		while (lsffisval == nil) do
+			--print("** ** got loadstring(ffi.string) = nil!",key,val,ffisval)
+			val = C.namespace_retrieve(self, key)
+			ffisval = ffi.string(val)
+			lsffisval = loadstring(ffisval)
+		end
+		--print("** ** got out OK!!!                    ",key,val,ffisval)
+	end
+	local lsffisvalcall = lsffisval()
+	return val ~= nil and lsffisvalcall or nil
 end
 
 --- Store a value in the namespace.
