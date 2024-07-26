@@ -1,6 +1,6 @@
 #!/bin/bash
 mkdir -p /mnt/huge
-(mount | grep hugetlbfs) > /dev/null || mount -t hugetlbfs nodev /mnt/huge
+(mount | grep hugetlbfs | grep 1024M) > /dev/null || mount -t hugetlbfs nodev /mnt/huge -o pagesize=1G
 for i in {0..7}
 do
 	if [[ -e "/sys/devices/system/node/node$i" ]]
