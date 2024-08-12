@@ -13,14 +13,27 @@ extern "C" {
 #endif
 
 #define PS_RING_SIZE_LIMIT 268435455
-
+#define PS_RING_MEMPOOL_BUF_SIZE RTE_MBUF_DEFAULT_BUF_SIZE /* 2048 */
+#define PS_RING_MEMPOOL_CACHE_SIZE 512
+  
+/**
+ * If we put mbufs directly into a large rte_ring, the mempool of the producer
+ * they are coming from may fill up.  This seems to be the case with the receive
+ * device.  Once it runs out of space for mbufs, calls to recv() block.
+ *
+ * In cases with large rte_ring, it makes sense to allocate our own mempool, 
+ * and enqueue copies of the mbufs, so we can free the ones owned by the producer.
+ */
+  
 struct ps_ring
 {
 	struct rte_ring* ring;
 	uint32_t capacity;
+	struct rte_mempool *pktmbuf_pool;  // null unless copy_mbufs is true
+	bool copy_mbufs;
 };
 
-struct ps_ring* create_psring(uint32_t capacity, int32_t socket);
+struct ps_ring* create_psring(uint32_t capacity, int32_t socket, bool copy_mbufs);
 
 /**
  * The difference between bulk and burst is when n>1.  In those

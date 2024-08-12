@@ -49,7 +49,7 @@ ffi.cdef [[
 	int bsring_bytesused(struct bs_ring* bsr);
 
 	struct ps_ring { };
-	struct ps_ring* create_psring(uint32_t capacity, int32_t socket);
+	struct ps_ring* create_psring(uint32_t capacity, int32_t socket, bool copy_mbufs);
 	int psring_enqueue_bulk(struct ps_ring* psr, struct rte_mbuf** obj, uint32_t n);
 	int psring_enqueue_burst(struct ps_ring* psr, struct rte_mbuf** obj, uint32_t n);
 	int psring_enqueue(struct ps_ring* psr, struct rte_mbuf* obj);
@@ -218,7 +218,7 @@ function mod:newPktsizedRing(capacity, socket)
 	size = size or 512
 	socket = socket or -1
 	return setmetatable({
-		ring = C.create_psring(capacity, socket)
+		ring = C.create_psring(capacity, socket, true)
 	}, pktsizedRing)
 end
 
