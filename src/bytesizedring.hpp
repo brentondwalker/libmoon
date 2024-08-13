@@ -16,11 +16,16 @@ extern "C" {
 
 #define BS_RING_SIZE_LIMIT 268435455
 #define FRAME_OVERHEAD 24
+#define BS_RING_MEMPOOL_BUF_SIZE RTE_MBUF_DEFAULT_BUF_SIZE /* 2048 */
+#define BS_RING_MEMPOOL_CACHE_SIZE 512
+
 
 struct bs_ring
 {
 	struct rte_ring* ring;
 	uint32_t capacity;
+	struct rte_mempool *pktmbuf_pool;  // null unless copy_mbufs is true
+        bool copy_mbufs;
 
 	/*
 	 * Keep track of the number of bytes in the ring buffer.
@@ -42,7 +47,7 @@ struct bs_ring
 	std::atomic<bool> ring_locked;
 };
 
-struct bs_ring* create_bsring(uint32_t capacity, int32_t socket);
+  struct bs_ring* create_bsring(uint32_t capacity, int32_t socket, bool copy_mbufs);
 
 /**
  * The difference between bulk and burst is when n>1.  In those

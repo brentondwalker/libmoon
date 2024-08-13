@@ -12,7 +12,7 @@ extern "C" {
    * Newer version of DPDK have a function for this.  Our version does not,
    * so I implement a basic deep copy function.
    */
-  rte_mbuf* diy_mbuf_copy(struct rte_mempool *pktmbuf_pool, struct rte_mbuf* src_mbf) {
+  inline rte_mbuf* diy_mbuf_copy(struct rte_mempool *pktmbuf_pool, struct rte_mbuf* src_mbf) {
 
     if (src_mbf->nb_segs > 1) {
       printf("ERROR: diy_mbuf_copy(): cannot copy an mbuf with more than one segment!\n");

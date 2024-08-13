@@ -37,7 +37,7 @@ ffi.cdef [[
 
 	// Byte-Sized Ring wrapper for DPDK SPSC ring
 	struct bs_ring { };
-	struct bs_ring* create_bsring(uint32_t capacity, int32_t socket);
+	struct bs_ring* create_bsring(uint32_t capacity, int32_t socket, bool copy_mbufs);
 	int bsring_enqueue_bulk(struct bs_ring* bsr, struct rte_mbuf** obj, uint32_t n);
 	int bsring_enqueue_burst(struct bs_ring* bsr, struct rte_mbuf** obj, uint32_t n);
 	int bsring_enqueue(struct bs_ring* bsr, struct rte_mbuf* obj);
@@ -88,7 +88,7 @@ function mod:newBytesizedRing(capacity, socket)
 	size = size or (1524*512)
 	socket = socket or -1
 	return setmetatable({
-		ring = C.create_bsring(capacity, socket)
+		ring = C.create_bsring(capacity, socket, true)
 	}, bytesizedRing)
 end
 
