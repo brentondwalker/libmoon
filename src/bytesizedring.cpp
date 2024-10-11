@@ -48,7 +48,9 @@ struct bs_ring* create_bsring(uint32_t capacity, int32_t socket, bool copy_mbufs
 	  sprintf(pool_name, "bsring_pool%d", __sync_fetch_and_add(&ring_cnt, 1));
 	  // mem pools are supposed to be of size (2^n - 1)
 	  // they also seem to have a minimum size of 2^10 -1, which I don't find documented anywhere.
-	  int pool_size = (count < BS_RING_MEMPOOL_MIN_SIZE) ? BS_RING_MEMPOOL_MIN_SIZE : count;
+	  // XXX - finding that the pool size has to be more than 2x larger than the max ring size
+	  //       oversize it by a factor of 4, but why??
+	  int pool_size = (4*count < BS_RING_MEMPOOL_MIN_SIZE) ? BS_RING_MEMPOOL_MIN_SIZE : 4*count;
 	  bsr->pktmbuf_pool = rte_pktmbuf_pool_create(pool_name, (pool_size-1),
 						      BS_RING_MEMPOOL_CACHE_SIZE, 0,
 						      BS_RING_MEMPOOL_BUF_SIZE,

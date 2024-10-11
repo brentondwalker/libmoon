@@ -32,6 +32,7 @@ struct ps_ring* create_psring(uint32_t capacity, int32_t socket, bool copy_mbufs
 	char ring_name[32];
 	struct ps_ring* psr = (struct ps_ring*)malloc(sizeof(struct ps_ring));
 	psr->capacity = capacity;
+	printf("allocating psring of size %d (actual size %d)\n", capacity, count);
 	sprintf(ring_name, "mbuf_ps_ring%d", __sync_fetch_and_add(&ring_cnt, 1));
 	psr->ring = rte_ring_create(ring_name, count, socket, RING_F_SP_ENQ | RING_F_SC_DEQ);
 	if (! psr->ring) {
@@ -46,7 +47,9 @@ struct ps_ring* create_psring(uint32_t capacity, int32_t socket, bool copy_mbufs
 	  sprintf(pool_name, "psring_pool%d", __sync_fetch_and_add(&ring_cnt, 1));
 	  // mem pools are supposed to be of size (2^n - 1)
 	  // they also seem to have a minimum size of 2^10 -1, which I don't find documented anywhere.
-	  int pool_size = (count < PS_RING_MEMPOOL_MIN_SIZE) ? PS_RING_MEMPOOL_MIN_SIZE : count;
+	  // XXX - finding that the pool size has to be more than 2x larger than the max ring size
+	  //       oversize it by a factor of 4, but why??
+	  int pool_size = (4*count < PS_RING_MEMPOOL_MIN_SIZE) ? PS_RING_MEMPOOL_MIN_SIZE : 4*count;
 	  psr->pktmbuf_pool = rte_pktmbuf_pool_create(pool_name, (pool_size-1),
 						      PS_RING_MEMPOOL_CACHE_SIZE, 0,
 						      PS_RING_MEMPOOL_BUF_SIZE,
@@ -78,6 +81,8 @@ int psring_enqueue_burst(struct ps_ring* psr, struct rte_mbuf** obj, uint32_t n)
 	uint32_t count = rte_ring_count(psr->ring);
 	//printf("\tpsring count is %d\n", count);
 
+	// in burst mode we add as many packets as will fit.
+	// compute how many packets we can enqueue.
 	int num_added = 0;
 	if (count < psr->capacity) {
 	  uint32_t num_to_add = ((count + n) > psr->capacity) ? (psr->capacity - count) : n;
