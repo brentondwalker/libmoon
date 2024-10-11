@@ -45,7 +45,9 @@ struct ps_ring* create_psring(uint32_t capacity, int32_t socket, bool copy_mbufs
 	  char pool_name[32];
 	  sprintf(pool_name, "psring_pool%d", __sync_fetch_and_add(&ring_cnt, 1));
 	  // mem pools are supposed to be of size (2^n - 1)
-	  psr->pktmbuf_pool = rte_pktmbuf_pool_create(pool_name, (count-1),
+	  // they also seem to have a minimum size of 2^10 -1, which I don't find documented anywhere.
+	  int pool_size = (count < PS_RING_MEMPOOL_MIN_SIZE) ? PS_RING_MEMPOOL_MIN_SIZE : count;
+	  psr->pktmbuf_pool = rte_pktmbuf_pool_create(pool_name, (pool_size-1),
 						      PS_RING_MEMPOOL_CACHE_SIZE, 0,
 						      PS_RING_MEMPOOL_BUF_SIZE,
 						      SOCKET_ID_ANY);

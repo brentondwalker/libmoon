@@ -15,6 +15,7 @@ extern "C" {
 #define PS_RING_SIZE_LIMIT 268435455
 #define PS_RING_MEMPOOL_BUF_SIZE RTE_MBUF_DEFAULT_BUF_SIZE /* 2048 */
 #define PS_RING_MEMPOOL_CACHE_SIZE 512
+#define PS_RING_MEMPOOL_MIN_SIZE 1024
   
 /**
  * If we put mbufs directly into a large rte_ring, the mempool of the producer
