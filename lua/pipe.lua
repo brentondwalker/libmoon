@@ -88,6 +88,14 @@ function mod:newBytesizedRing(capacity, socket)
 	size = size or (1524*512)
 	socket = socket or -1
 	return setmetatable({
+		ring = C.create_bsring(capacity, socket, false)
+	}, bytesizedRing)
+end
+
+function mod:newBytesizedCopyRing(capacity, socket)
+	size = size or (1524*512)
+	socket = socket or -1
+	return setmetatable({
 		ring = C.create_bsring(capacity, socket, true)
 	}, bytesizedRing)
 end
@@ -215,6 +223,14 @@ local pktsizedRing = mod.pktsizedRing
 pktsizedRing.__index = pktsizedRing
 
 function mod:newPktsizedRing(capacity, socket)
+	size = size or 512
+	socket = socket or -1
+	return setmetatable({
+		ring = C.create_psring(capacity, socket, false)
+	}, pktsizedRing)
+end
+
+function mod:newPktsizedCopyRing(capacity, socket)
 	size = size or 512
 	socket = socket or -1
 	return setmetatable({
